@@ -3,13 +3,19 @@
  * 根組件
  * 包含側邊欄導航和路由視圖
  */
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from './store/auth.store'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const sidebarCollapsed = ref(false)
+
+// 基於路由 meta 決定是否顯示側邊欄
+const showSidebar = computed(() => {
+  return route.meta.showSidebar === true && authStore.isAuthenticated
+})
 
 const handleLogout = async () => {
   await authStore.logout()
@@ -19,8 +25,8 @@ const handleLogout = async () => {
 
 <template>
   <div id="app">
-    <!-- 已登入：顯示側邊欄佈局 -->
-    <div v-if="authStore.isAuthenticated" class="app-layout">
+    <!-- 有側邊欄佈局 -->
+    <div v-if="showSidebar" class="app-layout">
       <!-- 側邊欄 -->
       <aside :class="['sidebar', { collapsed: sidebarCollapsed }]">
         <div class="sidebar-header">
@@ -32,7 +38,7 @@ const handleLogout = async () => {
           </button>
         </div>
 
-        <div class="user-info">
+        <div v-if="authStore.isAuthenticated" class="user-info">
           <div class="avatar">{{ authStore.userName.charAt(0).toUpperCase() }}</div>
           <div v-if="!sidebarCollapsed" class="user-name">
             {{ authStore.userName }}
@@ -40,26 +46,33 @@ const handleLogout = async () => {
         </div>
 
         <nav class="sidebar-nav">
-          <!-- 只有非管理者才能看到這些選單 -->
-          <router-link v-if="!authStore.isAdmin" to="/posts" class="nav-item">
+          <!-- 個人專區首頁：已登入的非管理者可見 -->
+          <router-link v-if="authStore.isAuthenticated && !authStore.isAdmin" to="/dashboard" class="nav-item">
+            <span class="icon">🏠</span>
+            <span v-if="!sidebarCollapsed">個人專區</span>
+          </router-link>
+          <!-- 所有文章：已登入的非管理者可見 -->
+          <router-link v-if="authStore.isAuthenticated && !authStore.isAdmin" to="/posts" class="nav-item">
             <span class="icon">📰</span>
             <span v-if="!sidebarCollapsed">所有文章</span>
           </router-link>
-          <router-link v-if="!authStore.isAdmin" to="/posts/my" class="nav-item">
+          <!-- 我的文章：已登入的非管理者可見 -->
+          <router-link v-if="authStore.isAuthenticated && !authStore.isAdmin" to="/posts/my" class="nav-item">
             <span class="icon">📝</span>
             <span v-if="!sidebarCollapsed">我的文章</span>
           </router-link>
-          <router-link v-if="!authStore.isAdmin" to="/short-urls" class="nav-item">
+          <!-- 短網址：已登入的非管理者可見 -->
+          <router-link v-if="authStore.isAuthenticated && !authStore.isAdmin" to="/short-urls" class="nav-item">
             <span class="icon">🔗</span>
             <span v-if="!sidebarCollapsed">短網址</span>
           </router-link>
-          <!-- 只有管理者才能看到商品管理 -->
-          <router-link v-if="authStore.isAdmin" to="/items" class="nav-item">
+          <!-- 商品管理：已登入的管理者可見 -->
+          <router-link v-if="authStore.isAuthenticated && authStore.isAdmin" to="/items" class="nav-item">
             <span class="icon">🛍️</span>
             <span v-if="!sidebarCollapsed">商品管理</span>
           </router-link>
-          <!-- 所有人都能看到登出 -->
-          <button @click="handleLogout" class="nav-item logout">
+          <!-- 登出：只有已登入用戶可見 -->
+          <button v-if="authStore.isAuthenticated" @click="handleLogout" class="nav-item logout">
             <span class="icon">🚪</span>
             <span v-if="!sidebarCollapsed">登出</span>
           </button>

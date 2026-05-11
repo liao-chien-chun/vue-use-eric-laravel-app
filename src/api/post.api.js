@@ -68,7 +68,7 @@ class PostAPI extends BaseAPI {
    * @returns {Promise}
    */
   updateComment(postId, commentId, commentData) {
-    return http.patch(`/${this.resource}/${postId}/comments/${commentId}`, commentData)
+    return http.put(`/${this.resource}/${postId}/comments/${commentId}`, commentData)
   }
 
   /**
@@ -79,6 +79,15 @@ class PostAPI extends BaseAPI {
    */
   deleteComment(postId, commentId) {
     return http.delete(`/${this.resource}/${postId}/comments/${commentId}`)
+  }
+
+  /**
+   * 記錄文章觀看
+   * @param {number} postId - 文章 ID
+   * @returns {Promise}
+   */
+  recordView(postId) {
+    return http.post(`/${this.resource}/${postId}/view`)
   }
 }
 

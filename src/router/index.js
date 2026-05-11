@@ -18,6 +18,7 @@ const routes = [
     meta: {
       title: '首頁',
       requiresAuth: false,
+      showSidebar: false,
     },
   },
   {
@@ -28,6 +29,7 @@ const routes = [
       title: '登入',
       requiresAuth: false,
       hideForAuth: true,
+      showSidebar: false,
     },
   },
   {
@@ -38,6 +40,7 @@ const routes = [
       title: '註冊',
       requiresAuth: false,
       hideForAuth: true,
+      showSidebar: false,
     },
   },
   // 文章相關路由
@@ -48,6 +51,7 @@ const routes = [
     meta: {
       title: '所有文章',
       requiresAuth: false,
+      showSidebar: false,
     },
   },
   {
@@ -57,6 +61,7 @@ const routes = [
     meta: {
       title: '我的文章',
       requiresAuth: true,
+      showSidebar: true,
     },
   },
   {
@@ -66,6 +71,7 @@ const routes = [
     meta: {
       title: '新增文章',
       requiresAuth: true,
+      showSidebar: true,
     },
   },
   {
@@ -75,6 +81,7 @@ const routes = [
     meta: {
       title: '編輯文章',
       requiresAuth: true,
+      showSidebar: true,
     },
   },
   {
@@ -84,6 +91,18 @@ const routes = [
     meta: {
       title: '文章詳情',
       requiresAuth: false,
+      showSidebar: false,
+    },
+  },
+  // 個人專區
+  {
+    path: '/dashboard',
+    name: 'Dashboard',
+    component: () => import('@/views/dashboard/DashboardView.vue'),
+    meta: {
+      title: '個人專區',
+      requiresAuth: true,
+      showSidebar: true,
     },
   },
   // 商品管理路由（僅限管理者）
@@ -95,6 +114,7 @@ const routes = [
       title: '商品管理',
       requiresAuth: true,
       requiresAdmin: true, // 只有管理者可以訪問
+      showSidebar: true,
     },
   },
   // 短網址路由
@@ -105,6 +125,7 @@ const routes = [
     meta: {
       title: '短網址',
       requiresAuth: true,
+      showSidebar: true,
     },
   },
   // 404 頁面
@@ -114,6 +135,7 @@ const routes = [
     component: () => import('@/views/NotFoundView.vue'),
     meta: {
       title: '頁面不存在',
+      showSidebar: false,
     },
   },
 ]
@@ -138,18 +160,25 @@ const router = createRouter({
  * 全域前置守衛
  * 在進入路由前檢查認證狀態
  */
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
   const requiresAuth = to.meta.requiresAuth
   const requiresAdmin = to.meta.requiresAdmin
   const hideForAuth = to.meta.hideForAuth
-  const isAuthenticated = authStore.isAuthenticated
-  const isAdmin = authStore.isAdmin
 
   // 設置頁面標題
   document.title = to.meta.title
     ? `${to.meta.title} - Vue3 Laravel Demo`
     : 'Vue3 Laravel Demo'
+
+  let isAuthenticated = authStore.isAuthenticated
+
+  // 需要登入的頁面不可只相信 localStorage，先向後端確認 token 是否仍有效。
+  if ((requiresAuth || hideForAuth) && authStore.token) {
+    isAuthenticated = await authStore.validateAuth()
+  }
+
+  const isAdmin = authStore.isAdmin
 
   // 需要登入但未登入，跳轉到登入頁
   if (requiresAuth && !isAuthenticated) {
@@ -163,15 +192,15 @@ router.beforeEach((to, from, next) => {
     console.warn('⚠️ 管理者只能訪問商品管理頁面')
     next({ name: 'Items' })
   }
-  // 需要管理者權限但不是管理者，跳轉到我的文章
+  // 需要管理者權限但不是管理者，跳轉到個人專區
   else if (requiresAdmin && !isAdmin) {
     console.warn('⚠️ 無權限訪問此頁面')
-    next({ name: 'MyPosts' })
+    next({ name: 'Dashboard' })
   }
   // 已登入但訪問登入/註冊頁
   else if (hideForAuth && isAuthenticated) {
-    // 管理者導向商品管理，一般用戶導向我的文章
-    next({ name: isAdmin ? 'Items' : 'MyPosts' })
+    // 管理者導向商品管理，一般用戶導向個人專區
+    next({ name: isAdmin ? 'Items' : 'Dashboard' })
   }
   // 允許訪問
   else {

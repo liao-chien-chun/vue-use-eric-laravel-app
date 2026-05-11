@@ -22,6 +22,16 @@ export const usePostStore = defineStore('post', () => {
   const myPosts = ref([])
 
   /**
+   * 分頁資訊
+   */
+  const pagination = ref({
+    current_page: 1,
+    per_page: 15,
+    total: 0,
+    last_page: 1
+  })
+
+  /**
    * 當前文章
    */
   const currentPost = ref(null)
@@ -61,9 +71,23 @@ export const usePostStore = defineStore('post', () => {
 
     try {
       const response = await postAPI.getAll(params)
-      // 後端格式: response.data.posts
-      const postsData = response.data?.posts || response.data || response
+      // 後端格式: response.data.posts 或 response.data.data（分頁）
+      const postsData = response.data?.data || response.data?.posts || response.data || response
       posts.value = Array.isArray(postsData) ? postsData : []
+
+      // 更新分頁資訊（如果有的話）
+      if (response.data?.pagination) {
+        pagination.value = response.data.pagination
+      } else if (response.data?.current_page) {
+        // Laravel 標準分頁格式
+        pagination.value = {
+          current_page: response.data.current_page,
+          per_page: response.data.per_page,
+          total: response.data.total,
+          last_page: response.data.last_page
+        }
+      }
+
       return true
     } catch (err) {
       error.value = formatErrorMessage(err, '獲取文章列表失敗')
@@ -91,6 +115,12 @@ export const usePostStore = defineStore('post', () => {
       // 確保 myPosts 永遠是陣列
       const posts = response.data?.posts || response.data || response
       myPosts.value = Array.isArray(posts) ? posts : []
+
+      // 更新分頁資訊
+      if (response.data?.pagination) {
+        pagination.value = response.data.pagination
+      }
+
       return true
     } catch (err) {
       error.value = formatErrorMessage(err, '獲取使用者文章失敗')
@@ -273,6 +303,7 @@ export const usePostStore = defineStore('post', () => {
     posts,
     myPosts,
     currentPost,
+    pagination,
     loading,
     error,
 

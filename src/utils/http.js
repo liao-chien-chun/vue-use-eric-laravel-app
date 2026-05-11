@@ -82,15 +82,15 @@ httpClient.interceptors.response.use(
           try {
             const { useAuthStore } = await import('@/store/auth.store')
             const authStore = useAuthStore()
-            authStore.user = null
-            authStore.token = null
+            authStore.clearAuth()
           } catch (err) {
             console.error('❌ 清除 store 狀態失敗:', err)
           }
 
           // 導向登入頁（避免循環重定向）
           if (window.location.pathname !== '/login') {
-            window.location.href = '/login'
+            const redirect = `${window.location.pathname}${window.location.search}`
+            window.location.href = `/login?redirect=${encodeURIComponent(redirect)}`
           }
           break
 

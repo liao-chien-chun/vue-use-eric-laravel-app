@@ -39,11 +39,11 @@ export const authAPI = {
   },
 
   /**
-   * 獲取當前使用者資料（如果後端有提供的話）
+   * 獲取當前使用者資料
    * @returns {Promise} 返回用戶資料
    */
   me() {
-    return http.get('/user/me')
+    return http.get('/user')
   },
 
   /**

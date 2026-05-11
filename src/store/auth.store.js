@@ -15,11 +15,14 @@ export const useAuthStore = defineStore('auth', () => {
    * 當前使用者資料
    * 從 localStorage 讀取已儲存的使用者資料
    */
-  const user = ref(
-    localStorage.getItem('user')
-      ? JSON.parse(localStorage.getItem('user'))
-      : null
-  )
+  const savedUser = localStorage.getItem('user')
+  const user = ref(null)
+
+  try {
+    user.value = savedUser ? JSON.parse(savedUser) : null
+  } catch (err) {
+    localStorage.removeItem('user')
+  }
 
   /**
    * 認證 token
@@ -35,6 +38,12 @@ export const useAuthStore = defineStore('auth', () => {
    * 錯誤訊息
    */
   const error = ref(null)
+
+  /**
+   * 是否正在驗證 token
+   */
+  const isValidating = ref(false)
+  const validationPromise = ref(null)
 
   // ========== Getters ==========
 
@@ -139,6 +148,17 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * 清除本地認證狀態
+   * 用於 token 過期、401 或登出後清理，不呼叫 API。
+   */
+  function clearAuth() {
+    user.value = null
+    token.value = null
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+  }
+
+  /**
    * 登出
    */
   async function logout() {
@@ -151,10 +171,7 @@ export const useAuthStore = defineStore('auth', () => {
       console.error('⚠️ 登出 API 調用失敗:', err)
     } finally {
       // 清除本地狀態
-      user.value = null
-      token.value = null
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
+      clearAuth()
       loading.value = false
 
       console.log('👋 已登出')
@@ -167,48 +184,68 @@ export const useAuthStore = defineStore('auth', () => {
    */
   async function fetchUser() {
     if (!token.value) {
+      clearAuth()
       return false
+    }
+
+    if (validationPromise.value) {
+      return await validationPromise.value
     }
 
     loading.value = true
+    isValidating.value = true
     error.value = null
 
-    try {
-      const response = await authAPI.me()
-      user.value = response.user || response
+    validationPromise.value = (async () => {
+      try {
+        const response = await authAPI.me()
+        user.value = response.data?.user || response.data || response.user || response
+        localStorage.setItem('user', JSON.stringify(user.value))
 
-      console.log('✅ 獲取使用者資料成功')
-      return true
-    } catch (err) {
-      // 如果 token 無效，清除認證資料
-      error.value = formatErrorMessage(err, '獲取使用者資料失敗')
-      console.error('❌ 獲取使用者資料失敗:', err)
+        console.log('✅ 獲取使用者資料成功')
+        return true
+      } catch (err) {
+        // 如果 token 無效，清除認證資料
+        error.value = formatErrorMessage(err, '獲取使用者資料失敗')
+        console.error('❌ 獲取使用者資料失敗:', err)
 
-      if (err.status === 401) {
-        // token 過期或無效
-        await logout()
+        if (err.status === 401) {
+          // token 過期或無效
+          clearAuth()
+        }
+
+        return false
+      } finally {
+        loading.value = false
+        isValidating.value = false
+        validationPromise.value = null
       }
+    })()
 
+    return await validationPromise.value
+  }
+
+  /**
+   * 驗證目前登入狀態
+   * 有本地 token 時會向後端確認 token 是否仍有效。
+   */
+  async function validateAuth() {
+    if (!token.value) {
+      clearAuth()
       return false
-    } finally {
-      loading.value = false
     }
+
+    return await fetchUser()
   }
 
   /**
    * 初始化認證狀態
-   * 應用啟動時調用，檢查 token 是否有效
-   *
-   * 注意：如果後端沒有 /user/me API，可以註解掉 fetchUser() 的調用
-   * 因為登入時已經儲存了 user 資料
+   * 應用啟動時調用，清除不完整的本地登入狀態。
+   * token 有效性由路由守衛在進入需登入頁面時向後端確認。
    */
   async function initAuth() {
-    if (token.value) {
-      // 如果後端有 /user/me API，可以調用來驗證 token 是否有效
-      // await fetchUser()
-
-      // 如果後端沒有 me API，只要有 token 就當作已登入
-      console.log('🔑 檢測到已儲存的 token，保持登入狀態')
+    if (!token.value) {
+      clearAuth()
     }
   }
 
@@ -219,6 +256,7 @@ export const useAuthStore = defineStore('auth', () => {
     token,
     loading,
     error,
+    isValidating,
 
     // Getters
     isAuthenticated,
@@ -231,7 +269,9 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     register,
     logout,
+    clearAuth,
     fetchUser,
+    validateAuth,
     initAuth,
   }
 })

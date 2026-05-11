@@ -29,6 +29,21 @@
       </button>
     </div>
 
+    <!-- 每頁筆數選擇 -->
+    <div class="per-page-selector">
+      <label class="per-page-label">每頁顯示：</label>
+      <div class="per-page-buttons">
+        <button
+          v-for="size in [10, 20, 30, 40, 50]"
+          :key="size"
+          :class="['per-page-btn', { active: perPage === size }]"
+          @click="changePerPage(size)"
+        >
+          {{ size }} 筆
+        </button>
+      </div>
+    </div>
+
     <!-- 載入中 -->
     <LoadingSpinner v-if="postStore.loading" text="載入中..." />
 
@@ -89,8 +104,68 @@
       </div>
     </div>
 
+    <!-- 分頁 -->
+    <div v-if="postStore.myPosts.length > 0 && postStore.pagination.last_page > 1" class="pagination">
+      <!-- 第一頁按鈕 -->
+      <button
+        @click="changePage(1)"
+        :disabled="currentPage === 1 || postStore.loading"
+        class="pagination-btn"
+        title="第一頁"
+      >
+        第一頁
+      </button>
+
+      <!-- 上一頁按鈕 -->
+      <button
+        @click="changePage(currentPage - 1)"
+        :disabled="currentPage === 1 || postStore.loading"
+        class="pagination-btn"
+      >
+        上一頁
+      </button>
+
+      <!-- 頁碼按鈕 -->
+      <div class="pagination-pages">
+        <button
+          v-for="page in getPaginationPages()"
+          :key="page"
+          @click="changePage(page)"
+          :class="['pagination-page', { active: page === currentPage }]"
+          :disabled="postStore.loading || page === '...'"
+        >
+          {{ page }}
+        </button>
+      </div>
+
+      <!-- 下一頁按鈕 -->
+      <button
+        @click="changePage(currentPage + 1)"
+        :disabled="currentPage === postStore.pagination.last_page || postStore.loading"
+        class="pagination-btn"
+      >
+        下一頁
+      </button>
+
+      <!-- 最後一頁按鈕 -->
+      <button
+        @click="changePage(postStore.pagination.last_page)"
+        :disabled="currentPage === postStore.pagination.last_page || postStore.loading"
+        class="pagination-btn"
+        title="最後一頁"
+      >
+        最後一頁
+      </button>
+
+      <!-- 分頁資訊（移到下方單獨一行） -->
+      <div class="pagination-info">
+        第 {{ currentPage }} / {{ postStore.pagination.last_page }} 頁，
+        共 {{ postStore.pagination.total }} 篇文章
+      </div>
+    </div>
+
     <!-- 空狀態 -->
-    <div v-else class="empty-state">
+    <div v-else-if="postStore.myPosts.length === 0" class="empty-state">
       <p v-if="currentStatus === 2">還沒有已發布的文章，趕快新增第一篇吧！</p>
       <p v-else-if="currentStatus === 1">目前沒有草稿文章</p>
       <p v-else-if="currentStatus === 3">目前沒有隱藏的文章</p>
@@ -124,19 +199,32 @@ const authStore = useAuthStore()
 const currentStatus = ref(2)
 
 /**
+ * 當前頁碼
+ */
+const currentPage = ref(1)
+
+/**
+ * 每頁顯示筆數
+ */
+const perPage = ref(15)
+
+/**
  * 獲取我的文章
  * @param {number} status - 文章狀態
+ * @param {number} page - 頁碼
  */
-const fetchMyPosts = async (status = 2) => {
+const fetchMyPosts = async (status = 2, page = 1) => {
   if (authStore.user?.id) {
     console.log('🔍 Debug - 當前用戶 ID:', authStore.user.id)
     console.log('🔍 Debug - 請求狀態:', status)
+    console.log('🔍 Debug - 請求頁碼:', page)
+    console.log('🔍 Debug - 每頁筆數:', perPage.value)
     console.log('🔍 Debug - Token:', localStorage.getItem('token') ? '已設置' : '未設置')
 
     await postStore.fetchUserPosts(authStore.user.id, {
       status,
-      per_page: 15,
-      page: 1
+      per_page: perPage.value,
+      page
     })
 
     if (postStore.error) {
@@ -151,7 +239,71 @@ const fetchMyPosts = async (status = 2) => {
  */
 const changeStatus = async (status) => {
   currentStatus.value = status
-  await fetchMyPosts(status)
+  currentPage.value = 1  // 切換狀態時重置為第一頁
+  await fetchMyPosts(status, 1)
+}
+
+/**
+ * 切換頁碼
+ * @param {number} page - 頁碼
+ */
+const changePage = async (page) => {
+  if (page < 1 || page > postStore.pagination.last_page) return
+  currentPage.value = page
+  await fetchMyPosts(currentStatus.value, page)
+  // 滾動到頂部
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+/**
+ * 切換每頁顯示筆數
+ * @param {number} size - 每頁筆數
+ */
+const changePerPage = async (size) => {
+  perPage.value = size
+  currentPage.value = 1  // 重置為第一頁
+  await fetchMyPosts(currentStatus.value, 1)
+  // 滾動到頂部
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+/**
+ * 生成分頁頁碼陣列
+ * 最多顯示 7 個頁碼
+ */
+const getPaginationPages = () => {
+  const total = postStore.pagination.last_page
+  const current = currentPage.value
+  const pages = []
+
+  if (total <= 7) {
+    // 總頁數 <= 7，顯示全部
+    for (let i = 1; i <= total; i++) {
+      pages.push(i)
+    }
+  } else {
+    // 總頁數 > 7，智能顯示
+    if (current <= 4) {
+      // 當前頁靠前：1 2 3 4 5 ... 最後
+      for (let i = 1; i <= 5; i++) pages.push(i)
+      pages.push('...')
+      pages.push(total)
+    } else if (current >= total - 3) {
+      // 當前頁靠後：1 ... 倒數5 倒數4 倒數3 倒數2 最後
+      pages.push(1)
+      pages.push('...')
+      for (let i = total - 4; i <= total; i++) pages.push(i)
+    } else {
+      // 當前頁在中間：1 ... 前 當前 後 ... 最後
+      pages.push(1)
+      pages.push('...')
+      for (let i = current - 1; i <= current + 1; i++) pages.push(i)
+      pages.push('...')
+      pages.push(total)
+    }
+  }
+
+  return pages
 }
 
 /**
@@ -226,8 +378,8 @@ const getStatusClass = (status) => {
 }
 
 onMounted(() => {
-  // 預設載入「發布」狀態的文章
-  fetchMyPosts(currentStatus.value)
+  // 預設載入「發布」狀態的文章，第一頁
+  fetchMyPosts(currentStatus.value, currentPage.value)
 })
 </script>
 
@@ -300,6 +452,59 @@ h1 {
 }
 
 .filter-btn.active {
+  border-color: #667eea;
+  background: #667eea;
+  color: white;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+/* 每頁筆數選擇器 */
+.per-page-selector {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 30px;
+  padding: 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.per-page-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #2c3e50;
+  white-space: nowrap;
+}
+
+.per-page-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.per-page-btn {
+  padding: 8px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  background: white;
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  white-space: nowrap;
+}
+
+.per-page-btn:hover {
+  border-color: #667eea;
+  color: #667eea;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+}
+
+.per-page-btn.active {
   border-color: #667eea;
   background: #667eea;
   color: white;
@@ -438,5 +643,193 @@ h1 {
   color: #7f8c8d;
   margin-bottom: 20px;
   font-size: 1.1rem;
+}
+
+/* 分頁樣式 */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-top: 40px;
+  padding: 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  flex-wrap: wrap;
+}
+
+.pagination-btn {
+  padding: 10px 16px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  white-space: nowrap;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background: #5568d3;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.pagination-btn:disabled {
+  background: #e0e0e0;
+  color: #95a5a6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.pagination-pages {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.pagination-page {
+  min-width: 38px;
+  height: 38px;
+  padding: 0 10px;
+  background: white;
+  color: #2c3e50;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pagination-page:hover:not(:disabled):not(.active) {
+  border-color: #667eea;
+  color: #667eea;
+  transform: translateY(-2px);
+}
+
+.pagination-page.active {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.pagination-page:disabled {
+  cursor: default;
+  border-color: transparent;
+  background: transparent;
+}
+
+.pagination-info {
+  width: 100%;
+  text-align: center;
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #ecf0f1;
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+  .my-posts-view {
+    padding: 20px 10px;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+  }
+
+  .status-filters {
+    flex-direction: column;
+    padding: 15px;
+  }
+
+  .filter-btn {
+    width: 100%;
+  }
+
+  /* 每頁筆數選擇器 - 手機版 */
+  .per-page-selector {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 15px;
+    gap: 10px;
+  }
+
+  .per-page-buttons {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .per-page-btn {
+    flex: 1;
+    padding: 8px 10px;
+    font-size: 0.85rem;
+  }
+
+  .post-card {
+    flex-direction: column;
+    padding: 20px;
+  }
+
+  .post-actions {
+    width: 100%;
+    flex-direction: row;
+    min-width: auto;
+  }
+
+  .btn-action {
+    flex: 1;
+  }
+
+  .pagination {
+    gap: 8px;
+    padding: 15px;
+  }
+
+  .pagination-btn {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+  }
+
+  /* 手機端隱藏文字，只顯示符號 */
+  .pagination-btn:first-child::before {
+    content: '⏮';
+  }
+  .pagination-btn:last-of-type::before {
+    content: '⏭';
+  }
+  .pagination-btn:first-child,
+  .pagination-btn:last-of-type {
+    font-size: 0;
+  }
+  .pagination-btn:first-child::before,
+  .pagination-btn:last-of-type::before {
+    font-size: 1rem;
+  }
+
+  .pagination-page {
+    min-width: 34px;
+    height: 34px;
+    font-size: 0.85rem;
+  }
+
+  .pagination-info {
+    font-size: 0.85rem;
+  }
 }
 </style>
