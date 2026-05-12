@@ -7,6 +7,66 @@
 import axios from 'axios'
 import appConfig from '@/config/app.config'
 
+let isRedirectingToLogin = false
+let authProbePromise = null
+
+const authProbeClient = axios.create({
+  baseURL: appConfig.api.baseURL,
+  timeout: appConfig.api.timeout,
+  withCredentials: appConfig.api.withCredentials,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  },
+})
+
+async function clearAuthState() {
+  // 完整清除認證狀態（localStorage + Pinia store）
+  localStorage.removeItem('token')
+  localStorage.removeItem('user')
+
+  try {
+    const { useAuthStore } = await import('@/store/auth.store')
+    const authStore = useAuthStore()
+    authStore.clearAuth()
+  } catch (err) {
+    console.error('❌ 清除 store 狀態失敗:', err)
+  }
+}
+
+function redirectToLogin() {
+  if (isRedirectingToLogin) return
+  isRedirectingToLogin = true
+
+  // 導向登入頁（避免循環重定向）
+  if (window.location.pathname !== '/login') {
+    const redirect = `${window.location.pathname}${window.location.search}`
+    window.location.href = `/login?redirect=${encodeURIComponent(redirect)}`
+  }
+}
+
+async function probeTokenValid(token) {
+  if (!token) return false
+  if (authProbePromise) return await authProbePromise
+
+  authProbePromise = (async () => {
+    try {
+      const resp = await authProbeClient.get('/user', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      return resp.status >= 200 && resp.status < 300
+    } catch (err) {
+      return false
+    } finally {
+      authProbePromise = null
+    }
+  })()
+
+  return await authProbePromise
+}
+
 /**
  * 創建 Axios 實例
  * 配置基礎 URL、超時時間等
@@ -74,29 +134,26 @@ httpClient.interceptors.response.use(
           // 未授權，完整清除認證狀態
           console.error('❌ 未授權，請重新登入')
 
-          // 完整清除認證狀態
-          localStorage.removeItem('token')
-          localStorage.removeItem('user')
-
-          // 動態導入 auth store 並登出
-          try {
-            const { useAuthStore } = await import('@/store/auth.store')
-            const authStore = useAuthStore()
-            authStore.clearAuth()
-          } catch (err) {
-            console.error('❌ 清除 store 狀態失敗:', err)
-          }
-
-          // 導向登入頁（避免循環重定向）
-          if (window.location.pathname !== '/login') {
-            const redirect = `${window.location.pathname}${window.location.search}`
-            window.location.href = `/login?redirect=${encodeURIComponent(redirect)}`
-          }
+          await clearAuthState()
+          redirectToLogin()
           break
 
         case 403:
           // 禁止訪問
           console.warn('🚫 Forbidden - 沒有權限')
+
+          // 有些後端會在 token 過期時回 403。
+          // 為了避免「停留在同頁面點按鈕只看到沒有權限」的誤導體驗，
+          // 這裡做一次輕量探測：若 token 其實已失效，就當作登出並導向登入。
+          {
+            const token = localStorage.getItem('token')
+            const tokenValid = await probeTokenValid(token)
+            if (!tokenValid) {
+              console.warn('🔒 Token 可能已失效，請重新登入')
+              await clearAuthState()
+              redirectToLogin()
+            }
+          }
           break
 
         case 404:
