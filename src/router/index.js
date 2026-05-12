@@ -128,6 +128,28 @@ const routes = [
       showSidebar: true,
     },
   },
+
+  // 優惠券（前台）
+  {
+    path: '/coupons',
+    name: 'Coupons',
+    component: () => import('@/views/coupons/CouponsView.vue'),
+    meta: {
+      title: '優惠券',
+      requiresAuth: false,
+      showSidebar: false,
+    },
+  },
+  {
+    path: '/coupons/:id',
+    name: 'CouponDetail',
+    component: () => import('@/views/coupons/CouponDetailView.vue'),
+    meta: {
+      title: '優惠券詳情',
+      requiresAuth: false,
+      showSidebar: false,
+    },
+  },
   // 404 頁面
   {
     path: '/:pathMatch(.*)*',

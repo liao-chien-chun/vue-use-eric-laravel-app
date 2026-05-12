@@ -66,6 +66,11 @@ const handleLogout = async () => {
             <span class="icon">🔗</span>
             <span v-if="!sidebarCollapsed">短網址</span>
           </router-link>
+          <!-- 領取優惠券：已登入的非管理者可見（前台頁面） -->
+          <router-link v-if="authStore.isAuthenticated && !authStore.isAdmin" to="/coupons" class="nav-item">
+            <span class="icon">🎟️</span>
+            <span v-if="!sidebarCollapsed">領取優惠券</span>
+          </router-link>
           <!-- 商品管理：已登入的管理者可見 -->
           <router-link v-if="authStore.isAuthenticated && authStore.isAdmin" to="/items" class="nav-item">
             <span class="icon">🛍️</span>

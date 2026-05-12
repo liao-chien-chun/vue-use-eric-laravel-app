@@ -87,6 +87,12 @@ const httpClient = axios.create({
  */
 httpClient.interceptors.request.use(
   (config) => {
+    // 允許個別請求跳過自動帶 token（例如：同支 API 依登入與否回傳不同欄位）
+    if (config?.skipAuth) {
+      console.log('📤 Request: skipAuth enabled')
+      return config
+    }
+
     // 從 localStorage 獲取 token
     const token = localStorage.getItem('token')
 
