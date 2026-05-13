@@ -23,6 +23,10 @@ export const useCouponStore = defineStore('coupon', () => {
   const loading = ref(false)
   const error = ref(null)
 
+  // 領取動作狀態（避免影響列表 loading）
+  const claimingCouponId = ref(null)
+  const claimError = ref(null)
+
   const totalCoupons = computed(() => coupons.value.length)
 
   async function fetchCoupons(params = {}) {
@@ -77,6 +81,55 @@ export const useCouponStore = defineStore('coupon', () => {
     }
   }
 
+  /**
+   * 領取優惠券
+   * 成功後會同步更新本地 coupons/currentCoupon 的狀態
+   */
+  async function claimCoupon(couponId) {
+    claimError.value = null
+    claimingCouponId.value = couponId
+
+    try {
+      const response = await couponAPI.claim(couponId)
+
+      // 本地同步：將該券標記為已領取，並關閉可領取
+      const listItem = Array.isArray(coupons.value)
+        ? coupons.value.find(c => String(c.id) === String(couponId))
+        : null
+
+      if (listItem) {
+        listItem.is_claimed = true
+        listItem.can_claim = false
+
+        if (typeof listItem.remaining_quantity === 'number' && listItem.remaining_quantity > 0) {
+          listItem.remaining_quantity -= 1
+        }
+      }
+
+      if (currentCoupon.value && String(currentCoupon.value.id) === String(couponId)) {
+        currentCoupon.value.is_claimed = true
+        currentCoupon.value.can_claim = false
+
+        if (typeof currentCoupon.value.remaining_quantity === 'number' && currentCoupon.value.remaining_quantity > 0) {
+          currentCoupon.value.remaining_quantity -= 1
+        }
+      }
+
+      return {
+        success: true,
+        message: response?.message || '優惠券領取成功',
+        data: response?.data || null,
+      }
+    } catch (err) {
+      const message = formatErrorMessage(err, '優惠券領取失敗')
+      claimError.value = message
+      console.error('❌ 優惠券領取失敗:', err)
+      return { success: false, message }
+    } finally {
+      claimingCouponId.value = null
+    }
+  }
+
   function reset() {
     coupons.value = []
     currentCoupon.value = null
@@ -88,6 +141,9 @@ export const useCouponStore = defineStore('coupon', () => {
     }
     loading.value = false
     error.value = null
+
+    claimingCouponId.value = null
+    claimError.value = null
   }
 
   return {
@@ -98,8 +154,12 @@ export const useCouponStore = defineStore('coupon', () => {
     error,
     totalCoupons,
 
+    claimingCouponId,
+    claimError,
+
     fetchCoupons,
     fetchCoupon,
+    claimCoupon,
     reset,
   }
 })

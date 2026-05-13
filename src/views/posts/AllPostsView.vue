@@ -234,7 +234,7 @@ const authStore = useAuthStore()
 const keyword = ref('')
 const sortBy = ref('created_at')
 const order = ref('desc')
-const perPage = ref(15)
+const perPage = ref(10)
 const currentPage = ref(1)
 
 /**
@@ -242,7 +242,7 @@ const currentPage = ref(1)
  */
 const pagination = ref({
   current_page: 1,
-  per_page: 15,
+  per_page: 10,
   total: 0,
   last_page: 1
 })

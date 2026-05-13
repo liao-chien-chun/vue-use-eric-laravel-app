@@ -141,6 +141,26 @@ const routes = [
     },
   },
   {
+    path: '/coupons/my',
+    name: 'MyCoupons',
+    component: () => import('@/views/coupons/MyCouponsView.vue'),
+    meta: {
+      title: '我的優惠券',
+      requiresAuth: true,
+      showSidebar: true,
+    },
+  },
+  {
+    path: '/coupons/my/:id',
+    name: 'MyCouponDetail',
+    component: () => import('@/views/coupons/MyCouponDetailView.vue'),
+    meta: {
+      title: '優惠券詳情',
+      requiresAuth: true,
+      showSidebar: true,
+    },
+  },
+  {
     path: '/coupons/:id',
     name: 'CouponDetail',
     component: () => import('@/views/coupons/CouponDetailView.vue'),

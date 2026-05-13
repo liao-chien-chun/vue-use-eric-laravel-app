@@ -61,6 +61,11 @@ const handleLogout = async () => {
             <span class="icon">📝</span>
             <span v-if="!sidebarCollapsed">我的文章</span>
           </router-link>
+          <!-- 我的優惠券：已登入的非管理者可見 -->
+          <router-link v-if="authStore.isAuthenticated && !authStore.isAdmin" to="/coupons/my" class="nav-item">
+            <span class="icon">🎫</span>
+            <span v-if="!sidebarCollapsed">我的優惠券</span>
+          </router-link>
           <!-- 短網址：已登入的非管理者可見 -->
           <router-link v-if="authStore.isAuthenticated && !authStore.isAdmin" to="/short-urls" class="nav-item">
             <span class="icon">🔗</span>

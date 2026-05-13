@@ -45,8 +45,10 @@
             <button
               type="button"
               class="btn-claim"
+              :disabled="couponStore.claimingCouponId === coupon.id"
+              @click="handleClaim(coupon)"
             >
-              領取
+              {{ couponStore.claimingCouponId === coupon.id ? '領取中...' : '領取' }}
             </button>
           </div>
 
@@ -138,6 +140,17 @@ const formatMoney = (value) => {
 onMounted(() => {
   couponStore.fetchCoupon(couponId)
 })
+
+const handleClaim = async (coupon) => {
+  if (!coupon?.id) return
+  const result = await couponStore.claimCoupon(coupon.id)
+  if (result.success) {
+    alert(result.message)
+    await couponStore.fetchCoupon(coupon.id)
+  } else {
+    alert(result.message)
+  }
+}
 </script>
 
 <style scoped>

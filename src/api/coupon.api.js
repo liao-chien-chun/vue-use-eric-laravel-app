@@ -21,6 +21,23 @@ export const couponAPI = {
   getById(id, config = {}) {
     return http.get(`/coupons/${id}`, { ...config })
   },
+
+  /**
+   * 取得我的優惠券（已領取）
+   * GET /coupons/my?per_page=15&page=1&status=2
+   * status: 1=未使用, 2=已使用
+   */
+  getMyCoupons(params = {}, config = {}) {
+    return http.get('/coupons/my', { params, ...config })
+  },
+
+  /**
+   * 領取優惠券
+   * POST /coupons/:id/claim
+   */
+  claim(id, config = {}) {
+    return http.post(`/coupons/${id}/claim`, {}, { ...config })
+  },
 }
 
 export default couponAPI

@@ -206,7 +206,8 @@ const currentPage = ref(1)
 /**
  * 每頁顯示筆數
  */
-const perPage = ref(15)
+// 預設每頁顯示 10 筆（與其他列表頁一致）
+const perPage = ref(10)
 
 /**
  * 獲取我的文章

@@ -93,9 +93,10 @@
               <button
                 type="button"
                 class="btn-claim"
-                @click.stop="goToCoupon(coupon.id)"
+                :disabled="couponStore.claimingCouponId === coupon.id"
+                @click.stop="handleClaim(coupon)"
               >
-                領取
+                {{ couponStore.claimingCouponId === coupon.id ? '領取中...' : '領取' }}
               </button>
             </div>
           </div>
@@ -179,7 +180,7 @@ const router = useRouter()
 const couponStore = useCouponStore()
 const authStore = useAuthStore()
 
-const perPage = ref(15)
+const perPage = ref(10)
 const currentPage = ref(1)
 
 const pagination = computed(() => couponStore.pagination)
@@ -189,6 +190,17 @@ const fetchCoupons = async (page = 1) => {
     per_page: perPage.value,
     page,
   })
+}
+
+const handleClaim = async (coupon) => {
+  if (!coupon?.id) return
+  const result = await couponStore.claimCoupon(coupon.id)
+  if (result.success) {
+    alert(result.message)
+    await fetchCoupons(currentPage.value)
+  } else {
+    alert(result.message)
+  }
 }
 
 const changePerPage = async (size) => {
